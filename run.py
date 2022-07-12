@@ -43,24 +43,25 @@ ANY UNITS YOU WANT IN BETWEEN, I SUGGEST USING SI UNITS.
 
 """
 # For part A
-R = np.array([[5.0e-10, 0.0, 0.0]])
+R = np.array([[1.05e-10, 0.0, 0.0]])
 mass = np.array([6.6335209e-26])
 
 # CREATE AN OBJECT OF THE SIMULATION CLASS.
-mysim = Simulation(dt=1.0e-15, L=22.6e-10, Nsteps=100, R=R, mass=mass, deltaMC=1.256153846153846e-10,
-                   kind=["Ar"], ftype="LJMC", printfreq=10,  outname="MCsim.log")
+mysim = Simulation(dt=1.0e-16, L=1, Nsteps=1000, R=R, mass=mass,
+                   kind=["Ar"], ftype="DoubleWell", printfreq=1,  outname="sim.log")
 # DEFINE THE PARAMETERS FOR THE POTENTIAL.
 params_A = { "omega": 7.596337239980638e13 } 
 params_B = { "eps":  1.656778224E-21, "sig": 3.4E-10 }
+params_Final = { "A": 4.11e20 , "B": 8.22 }
 # READ THE INITIAL XYZ FILE PROVIDED OR SAMPLE INITIAL COORDINATES.
-mysim.readXYZ('Ar_init.xyz')
+# mysim.readXYZ('Ar_init.xyz')
 # Set the mass array and scale R to angstrom
-mysim.mass = np.array([6.6335209e-26] * mysim.R.shape[0])
-mysim.R = mysim.R * 1e-10
+# mysim.mass = np.array([6.6335209e-26] * mysim.R.shape[0])
+# mysim.R = mysim.R * 1e-10
 # SAMPLE INITIAL MOMENTA FROM MB DISTRIBUTION.
 # mysim.sampleMB(temp=298.0)
 # # REMOVE COM MOTION.
 # mysim.removeRCM()
 # RUN THE SIMULATION, INCLUDING PRINTING XYZ AND ENERGIES TO FILES.
-mysim.runMC(**params_B)
+mysim.runMeta(**params_Final)
 mysim.__del__()

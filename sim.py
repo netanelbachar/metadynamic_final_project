@@ -52,7 +52,7 @@ class Simulation:
     
     def __init__( self, dt, L, Nsteps=0, R=None, mass=None, kind=None, \
                  p=None, F=None, U=None, K=None, seed=937142, ftype=None, \
-                 deltaMC=0.5e-10, temp=298, \
+                 deltaMC=0.5e-10, temp=298, NG = 300, \
                  step=0, printfreq=1000, xyzname="sim.xyz", fac=1.0, \
                  outname="sim.log", debug=False ):
         """
@@ -134,6 +134,7 @@ class Simulation:
         self.seed = seed 
         self.step = step         
         self.fac = fac
+        self.NG = NG # Number of steps for Gaussian addition
         
         self.temp = temp
         self.accepted = 0
@@ -505,6 +506,7 @@ class Simulation:
         
         v_part = A*self.R**4 - B*self.R**2
         self.U = np.sum(v_part) # numpy.sum() sums along first axis
+        self.F = -4*A*self.R**3 + 2*B*self.R
         
     def CalcKinE( self ):
         """
@@ -587,12 +589,35 @@ class Simulation:
         
         self.evalForce(**kwargs) # calculate the initial potential energy
         while self.step <= self.Nsteps:
-            self.E = self.U + self.K
+            self.E = self.U + self.K                
             if self.step % self.printfreq == 0:
                 self.dumpThermo()
                 self.dumpXYZ()
             self.MCstep(**kwargs)
             self.step += 1
+            
+    def runMeta( self, **kwargs ):
+         """ 
+         MD with metadynamics implementation
+
+         Returns
+         -------
+         None.
+         """
+         
+         self.evalForce(**kwargs)
+         while self.step <= self.Nsteps:
+             self.CalcKinE()
+             self.E = self.U + self.K
+             if self.step % NG == 0:
+                  self.metadynamics()               
+                  self.evalMeta() # not final
+             if self.step % self.printfreq == 0:
+                 self.dumpThermo()
+                 self.dumpXYZ()
+             self.VVstep(**kwargs)
+             self.applyPBC()
+             self.step += 1
         
     def run( self, **kwargs ):
         """
