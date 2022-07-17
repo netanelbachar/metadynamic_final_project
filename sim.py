@@ -609,7 +609,11 @@ class Simulation:
          while self.step <= self.Nsteps:
              self.CalcKinE()
              self.E = self.U + self.K
-             if self.step % NG == 0:
+             if self.step % self.NG == 0:
+                 # deposit gaussian at particle's position
+                 # calculate the potential VG of the gaussian along the potential grid
+                 # calculate the new potential overall (next NG steps need to be affected by the new gauss)
+                 # for each step calculate the force from original potential + newer deposited
                   self.metadynamics()               
                   self.evalMeta() # not final
              if self.step % self.printfreq == 0:
