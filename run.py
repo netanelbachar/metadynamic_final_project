@@ -43,7 +43,7 @@ ANY UNITS YOU WANT IN BETWEEN, I SUGGEST USING SI UNITS.
 
 """
 # For part A
-R = np.array([[5.0e-10, 0.0, 0.0]])
+R =  np.array([[5.0e-10, 0.0, 0.0]])
 mass = np.array([6.6335209e-26])
 
 # CREATE AN OBJECT OF THE SIMULATION CLASS.
