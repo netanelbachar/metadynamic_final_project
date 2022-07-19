@@ -43,12 +43,13 @@ ANY UNITS YOU WANT IN BETWEEN, I SUGGEST USING SI UNITS.
 
 """
 # For part A
-R = np.array([[1.05e-10, 0.0, 0.0]])
+R = np.array([[-1.05e-10, 0.0, 0.0]])
 mass = np.array([6.6335209e-26])
+dt = 1.0e-15
 
 # CREATE AN OBJECT OF THE SIMULATION CLASS.
-mysim = Simulation(dt=1.0e-16, L=1, Nsteps=1000, R=R, mass=mass,
-                   kind=["Ar"], ftype="DoubleWell", printfreq=1,  outname="sim.log")
+mysim = Simulation(dt=dt, L=5e-10, Nsteps=5000, R=R, mass=mass, kind=["Ar"], ftype="DoubleWell", printfreq=10)
+
 # DEFINE THE PARAMETERS FOR THE POTENTIAL.
 params_A = { "omega": 7.596337239980638e13 } 
 params_B = { "eps":  1.656778224E-21, "sig": 3.4E-10 }

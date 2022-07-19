@@ -46,13 +46,14 @@ SEE MORE INSTRUCTIONS THERE.
 import numpy as np
 import pandas as pd
 from scipy.constants import Boltzmann as BOLTZMANN
+import math
 import matplotlib.pyplot as plt
 
 class Simulation:
     
     def __init__( self, dt, L, Nsteps=0, R=None, mass=None, kind=None, \
                  p=None, F=None, U=None, K=None, seed=937142, ftype=None, \
-                 deltaMC=0.5e-10, temp=298, NG = 300, \
+                 deltaMC=0.5e-10, temp=298, NG = 300, res=1000, \
                  step=0, printfreq=1000, xyzname="sim.xyz", fac=1.0, \
                  outname="sim.log", debug=False ):
         """
@@ -140,6 +141,11 @@ class Simulation:
         self.accepted = 0
         self.deltaMC = deltaMC
         self.particle_i = None
+        self.beta = 1 / (BOLTZMANN*self.temp)
+
+        self.RG = np.linspace(-L, L, res)
+        self.FG = np.zeros((1, self.RG.size)).flatten()
+        self.VG = np.zeros((1, self.RG.size)).flatten()
         
         #system        
         if R is not None:
@@ -507,7 +513,17 @@ class Simulation:
         v_part = A*self.R**4 - B*self.R**2
         self.U = np.sum(v_part) # numpy.sum() sums along first axis
         self.F = -4*A*self.R**3 + 2*B*self.R
-        
+
+    def gauss(self):
+        sigma = 0.4
+        w = 0.3
+        return w * np.exp((-self.R**2) / (2 * sigma**2))
+
+    def set_VG(self, gauss):
+
+
+        self.VG += array
+
     def CalcKinE( self ):
         """
         THIS FUNCTIONS EVALUATES THE KINETIC ENERGY OF THE SYSTEM.
@@ -540,6 +556,20 @@ class Simulation:
         self.evalForce(**kwargs)
         # Velocity is then propagated using the new forces
         self.p += 0.5*self.F*self.dt
+
+    def gamma(self):  # This is the friction term
+        g = 1 / (100 * self.dt)
+        return g
+
+    def xsi(self):  # This is the noise term
+        z = np.random.normal(0, 1, (self.Natoms, 3))
+        return z
+
+    def langevin(self):
+        c1 = math.exp(-1 * self.gamma() * self.dt / 2)
+        # c2 = math.sqrt((1 / self.beta / self.mass) * (1 - c1 ** 2))
+        c2 = math.sqrt((self.mass / self.beta) * (1 - c1 ** 2))
+        self.p = c1 * self.p + c2 * self.xsi()
         
     def MCstep( self, **kwargs ):
         """
@@ -610,16 +640,19 @@ class Simulation:
              self.CalcKinE()
              self.E = self.U + self.K
              if self.step % self.NG == 0:
+                 pass
                  # deposit gaussian at particle's position
                  # calculate the potential VG of the gaussian along the potential grid
                  # calculate the new potential overall (next NG steps need to be affected by the new gauss)
                  # for each step calculate the force from original potential + newer deposited
-                  self.metadynamics()               
-                  self.evalMeta() # not final
+                 #  self.metadynamics()
+                 #  self.evalMeta() # not final
              if self.step % self.printfreq == 0:
                  self.dumpThermo()
                  self.dumpXYZ()
+             self.langevin()
              self.VVstep(**kwargs)
+             self.langevin()
              self.applyPBC()
              self.step += 1
         
