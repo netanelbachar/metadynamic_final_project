@@ -513,16 +513,30 @@ class Simulation:
         v_part = A*self.R**4 - B*self.R**2
         self.U = np.sum(v_part) # numpy.sum() sums along first axis
         self.F = -4*A*self.R**3 + 2*B*self.R
+        index = self.get_index()
+        self.F += self.FG[index]
 
     def gauss(self):
-        sigma = 0.4
-        w = 0.3
-        return w * np.exp((-self.R**2) / (2 * sigma**2))
+        sigma = 10e-12
+        w = BOLTZMANN * self.temp * 0.5
+        distG = self.RG - self.R[0][0]  # Distance from each grid point to gauss center
+        potential =  w * np.exp(-(distG)**2 / (2 * sigma**2))
+        force = (distG / sigma**2) * potential
+        return potential, force
 
-    def set_VG(self, gauss):
+    def set_G(self):
+        U, F = self.gauss()
+        self.VG += U
+        self.FG += F
 
-
-        self.VG += array
+    def get_index(self):
+        '''
+        Calculates the index of particle's position in the grid array.
+        For an array from a to b, of N values: (x-a)/(b-a) * (N-1).
+        Implemented for one particle case.
+        :return: int: index
+        '''
+        return round(((self.R[0][0] - min(self.RG)) / (max(self.RG) - min(self.RG))) * (len(self.RG) - 1))
 
     def CalcKinE( self ):
         """
@@ -640,19 +654,14 @@ class Simulation:
              self.CalcKinE()
              self.E = self.U + self.K
              if self.step % self.NG == 0:
-                 pass
-                 # deposit gaussian at particle's position
-                 # calculate the potential VG of the gaussian along the potential grid
-                 # calculate the new potential overall (next NG steps need to be affected by the new gauss)
-                 # for each step calculate the force from original potential + newer deposited
-                 #  self.metadynamics()
-                 #  self.evalMeta() # not final
+                self.set_G()
              if self.step % self.printfreq == 0:
                  self.dumpThermo()
                  self.dumpXYZ()
-             self.langevin()
+             self.langevin()          # Langevine Dynamics+
+             self.evalForce(**kwargs)
              self.VVstep(**kwargs)
-             self.langevin()
+             self.langevin()          # Langevine Dynamics
              self.applyPBC()
              self.step += 1
         

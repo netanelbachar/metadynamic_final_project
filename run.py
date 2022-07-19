@@ -48,7 +48,8 @@ mass = np.array([6.6335209e-26])
 dt = 1.0e-15
 
 # CREATE AN OBJECT OF THE SIMULATION CLASS.
-mysim = Simulation(dt=dt, L=5e-10, Nsteps=5000, R=R, mass=mass, kind=["Ar"], ftype="DoubleWell", printfreq=10)
+mysim = Simulation(dt=dt, L=5e-10, Nsteps=5000, R=R, mass=mass, kind=["Ar"], ftype="DoubleWell", printfreq=10,
+                 NG=10000000)
 
 # DEFINE THE PARAMETERS FOR THE POTENTIAL.
 params_A = { "omega": 7.596337239980638e13 } 
