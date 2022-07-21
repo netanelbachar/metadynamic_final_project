@@ -53,7 +53,7 @@ class Simulation:
     
     def __init__( self, dt, L, Nsteps=0, R=None, mass=None, kind=None, \
                  p=None, F=None, U=None, K=None, seed=937142, ftype=None, \
-                 deltaMC=0.5e-10, temp=298, NG = 300, res=1000, \
+                 deltaMC=0.5e-10, temp=298, NG = 300, res=1000, wtm=False, \
                  step=0, printfreq=1000, xyzname="sim.xyz", fac=1.0, \
                  outname="sim.log", debug=False ):
         """
@@ -142,10 +142,15 @@ class Simulation:
         self.deltaMC = deltaMC
         self.particle_i = None
         self.beta = 1 / (BOLTZMANN*self.temp)
-
+        
+        self.wtm = wtm
         self.RG = np.linspace(-L, L, res)
+        self.ct = np.linspace(-L, L, res)
         self.FG = np.zeros((1, self.RG.size)).flatten()
         self.VG = np.zeros((1, self.RG.size)).flatten()
+        self.R_wtm = np.array([])
+        self.VG_wtm = np.array([])
+        self.ct_wtm = np.array([])
         
         #system        
         if R is not None:
@@ -517,17 +522,33 @@ class Simulation:
         self.F += self.FG[index]
 
     def gauss(self):
-        sigma = 10e-12
+        sigma = 10e-13
         w = BOLTZMANN * self.temp * 0.5
+        if self.wtm:
+            index = self.get_index()
+            gam = 4
+            height = np.exp(-1 / (gam-1) * self.beta * self.VG[index])
+            num = np.sum(np.exp( (gam/(gam-1)) * self.beta * self.VG ))
+            denom = np.sum(np.exp( (1/(gam-1)) * self.beta * self.VG ))
+            ct = (1 / self.beta) * np.log(num / denom)
+            wtm_vec = (self.R[0][0], self.VG[index], ct)     
+        else:
+            height = 1
+            wtm_vec = np.array([0,0,0])
+
         distG = self.RG - self.R[0][0]  # Distance from each grid point to gauss center
-        potential =  w * np.exp(-(distG)**2 / (2 * sigma**2))
-        force = (distG / sigma**2) * potential
-        return potential, force
+        potential =  w * np.exp(-(distG)**2 / (2 * sigma**2)) * height
+        force = (distG / sigma**2) * potential           
+        
+        return potential, force, wtm_vec
 
     def set_G(self):
-        U, F = self.gauss()
+        U, F, wtm_vec = self.gauss()
         self.VG += U
         self.FG += F
+        self.R_wtm = np.append(self.R_wtm, wtm_vec[0])
+        self.VG_wtm = np.append(self.VG_wtm, wtm_vec[1])
+        self.ct_wtm = np.append(self.ct_wtm, wtm_vec[2])
 
     def get_index(self):
         '''
@@ -658,7 +679,7 @@ class Simulation:
              if self.step % self.printfreq == 0:
                  self.dumpThermo()
                  self.dumpXYZ()
-             self.langevin()          # Langevine Dynamics+
+             self.langevin()          # Langevine Dynamics
              self.evalForce(**kwargs)
              self.VVstep(**kwargs)
              self.langevin()          # Langevine Dynamics
