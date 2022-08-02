@@ -46,13 +46,14 @@ SEE MORE INSTRUCTIONS THERE.
 import numpy as np
 import pandas as pd
 from scipy.constants import Boltzmann as BOLTZMANN
+import math
 import matplotlib.pyplot as plt
 
 class Simulation:
     
     def __init__( self, dt, L, Nsteps=0, R=None, mass=None, kind=None, \
                  p=None, F=None, U=None, K=None, seed=937142, ftype=None, \
-                 deltaMC=0.5e-10, temp=298, \
+                 deltaMC=0.5e-10, temp=298, NG = 300, res=1000, wtm=False, \
                  step=0, printfreq=1000, xyzname="sim.xyz", fac=1.0, \
                  outname="sim.log", debug=False ):
         """
@@ -134,11 +135,22 @@ class Simulation:
         self.seed = seed 
         self.step = step         
         self.fac = fac
+        self.NG = NG # Number of steps for Gaussian addition
         
         self.temp = temp
         self.accepted = 0
         self.deltaMC = deltaMC
         self.particle_i = None
+        self.beta = 1 / (BOLTZMANN*self.temp)
+        
+        self.wtm = wtm
+        self.RG = np.linspace(-L, L, res)
+        self.ct = np.linspace(-L, L, res)
+        self.FG = np.zeros((1, self.RG.size)).flatten()
+        self.VG = np.zeros((1, self.RG.size)).flatten()
+        self.R_wtm = np.array([])
+        self.VG_wtm = np.array([])
+        self.ct_wtm = np.array([])
         
         #system        
         if R is not None:
@@ -505,7 +517,48 @@ class Simulation:
         
         v_part = A*self.R**4 - B*self.R**2
         self.U = np.sum(v_part) # numpy.sum() sums along first axis
+        self.F = -4*A*self.R**3 + 2*B*self.R
+        index = self.get_index()
+        self.F += self.FG[index]
+
+    def gauss(self):
+        sigma = 10e-13
+        w = BOLTZMANN * self.temp * 0.5
+        if self.wtm:
+            index = self.get_index()
+            gam = 4
+            height = np.exp(-1 / (gam-1) * self.beta * self.VG[index])
+            num = np.sum(np.exp( (gam/(gam-1)) * self.beta * self.VG ))
+            denom = np.sum(np.exp( (1/(gam-1)) * self.beta * self.VG ))
+            ct = (1 / self.beta) * np.log(num / denom)
+            wtm_vec = (self.R[0][0], self.VG[index], ct)     
+        else:
+            height = 1
+            wtm_vec = np.array([0,0,0])
+
+        distG = self.RG - self.R[0][0]  # Distance from each grid point to gauss center
+        potential =  w * np.exp(-(distG)**2 / (2 * sigma**2)) * height
+        force = (distG / sigma**2) * potential           
         
+        return potential, force, wtm_vec
+
+    def set_G(self):
+        U, F, wtm_vec = self.gauss()
+        self.VG += U
+        self.FG += F
+        self.R_wtm = np.append(self.R_wtm, wtm_vec[0])
+        self.VG_wtm = np.append(self.VG_wtm, wtm_vec[1])
+        self.ct_wtm = np.append(self.ct_wtm, wtm_vec[2])
+
+    def get_index(self):
+        '''
+        Calculates the index of particle's position in the grid array.
+        For an array from a to b, of N values: (x-a)/(b-a) * (N-1).
+        Implemented for one particle case.
+        :return: int: index
+        '''
+        return round(((self.R[0][0] - min(self.RG)) / (max(self.RG) - min(self.RG))) * (len(self.RG) - 1))
+
     def CalcKinE( self ):
         """
         THIS FUNCTIONS EVALUATES THE KINETIC ENERGY OF THE SYSTEM.
@@ -538,6 +591,20 @@ class Simulation:
         self.evalForce(**kwargs)
         # Velocity is then propagated using the new forces
         self.p += 0.5*self.F*self.dt
+
+    def gamma(self):  # This is the friction term
+        g = 1 / (100 * self.dt)
+        return g
+
+    def xsi(self):  # This is the noise term
+        z = np.random.normal(0, 1, (self.Natoms, 3))
+        return z
+
+    def langevin(self):
+        c1 = math.exp(-1 * self.gamma() * self.dt / 2)
+        # c2 = math.sqrt((1 / self.beta / self.mass) * (1 - c1 ** 2))
+        c2 = math.sqrt((self.mass / self.beta) * (1 - c1 ** 2))
+        self.p = c1 * self.p + c2 * self.xsi()
         
     def MCstep( self, **kwargs ):
         """
@@ -587,12 +654,37 @@ class Simulation:
         
         self.evalForce(**kwargs) # calculate the initial potential energy
         while self.step <= self.Nsteps:
-            self.E = self.U + self.K
+            self.E = self.U + self.K                
             if self.step % self.printfreq == 0:
                 self.dumpThermo()
                 self.dumpXYZ()
             self.MCstep(**kwargs)
             self.step += 1
+            
+    def runMeta( self, **kwargs ):
+         """ 
+         MD with metadynamics implementation
+
+         Returns
+         -------
+         None.
+         """
+         
+         self.evalForce(**kwargs)
+         while self.step <= self.Nsteps:
+             self.CalcKinE()
+             self.E = self.U + self.K
+             if self.step % self.NG == 0:
+                self.set_G()
+             if self.step % self.printfreq == 0:
+                 self.dumpThermo()
+                 self.dumpXYZ()
+             self.langevin()          # Langevine Dynamics
+             self.evalForce(**kwargs)
+             self.VVstep(**kwargs)
+             self.langevin()          # Langevine Dynamics
+             self.applyPBC()
+             self.step += 1
         
     def run( self, **kwargs ):
         """
