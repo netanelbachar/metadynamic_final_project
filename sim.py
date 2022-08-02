@@ -504,7 +504,7 @@ class Simulation:
                   + str(A) + ", B= " + str(B) )
         
         v_part = A*self.R**4 - B*self.R**2
-        self.U = np.sum(v_part)  # numpy.sum() sums along first axis
+        self.U = np.sum(v_part) # numpy.sum() sums along first axis
         
     def CalcKinE( self ):
         """
